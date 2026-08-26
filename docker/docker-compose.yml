@@ -1,0 +1,15 @@
+services:
+  gallery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ..:/app
+    working_dir: /app
+    environment:
+      # Standardwerte; nur setzen, wenn die Bilder woanders liegen sollen.
+      # GALLERY_BASE_DIR: /app/bilder-demo
+      # GALLERY_CACHE_DIR: /app/var/cache/images
+      PHP_CLI_SERVER_WORKERS: "4"

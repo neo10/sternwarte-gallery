@@ -1,0 +1,12 @@
+# Erzeugte Bildvarianten – jederzeit aus den Originalen wiederherstellbar.
+/var/
+
+# Eigene Bilder gehören nicht ins Repository: alles unter bilder-demo/ wird
+# ignoriert, ausgenommen der kleine Demo-Jahrgang. So landet auch ein später
+# angelegter Ordner nicht aus Versehen im Repo.
+/bilder-demo/*
+!/bilder-demo/2024/
+
+# Betriebssystem-Beiwerk
+.DS_Store
+Thumbs.db
