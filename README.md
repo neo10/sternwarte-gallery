@@ -231,6 +231,10 @@ PHP 8.1 oder neuer mit den Erweiterungen `gd` (mit WebP-Unterstützung) und
 `exif`. Fehlt `gd`, liefert die Galerie die Originale aus und schreibt einen
 Hinweis ins Fehlerprotokoll.
 
+Geprüft gegen PHP 8.5 (Docker-Image und Testlauf, siehe unten) – die Version,
+die auch im netcup-Webhosting als Standard auswählbar ist. Läuft die Galerie
+sauber im Docker-Container, läuft sie damit auch dort.
+
 ## Lokaler Start mit Docker
 
 ```sh

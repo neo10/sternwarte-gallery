@@ -1,4 +1,7 @@
-FROM php:8.3-cli-bookworm
+# 8.5 hält den Container auf demselben Stand wie das netcup-Webhosting, wo
+# 8.5 im Kundenmenü als Standardversion auswählbar ist. Läuft die Galerie
+# hier sauber, läuft sie dort ebenso.
+FROM php:8.5-cli-bookworm
 
 # gd erzeugt die WebP-Varianten, exif liefert die Ausrichtung von Kamerabildern.
 # Ohne gd fällt die Galerie auf das Ausliefern der Originale zurück.
