@@ -44,11 +44,16 @@ $eTag = '"' . md5($imagePath . '|' . $modifiedAt . '|' . $size) . '"';
 // Ohne Fingerabdruck (direkter Aufruf, alter Link) kann sich der Inhalt unter
 // derselben URL ändern. Dann wird nur kurz gecacht und danach über
 // ETag/Last-Modified revalidiert, was ein 304 statt des ganzen Bildes kostet.
+//
+// "private" heißt: Speichern darf nur der Browser des Besuchers, keine
+// Zwischenstation wie ein Proxy oder CDN. Ein solcher Cache kennt
+// isAuthorized() nicht und würde ein geschütztes Bild an jeden ausliefern, der
+// die URL abruft. Bei einer öffentlichen Galerie kostet das praktisch nichts.
 $hasVersion = ($_GET['v'] ?? '') !== '';
 
 header($hasVersion
-    ? 'Cache-Control: public, max-age=31536000, immutable'
-    : 'Cache-Control: public, max-age=300');
+    ? 'Cache-Control: private, max-age=31536000, immutable'
+    : 'Cache-Control: private, max-age=300');
 header('ETag: ' . $eTag);
 header('Last-Modified: ' . $lastModified);
 header('X-Content-Type-Options: nosniff');

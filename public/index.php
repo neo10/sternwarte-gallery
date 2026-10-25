@@ -59,7 +59,7 @@ function imageUrl(string $path, ImageVariant $variant, string $version): string
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($currentFolder['name']) ?> – <?= e($config->title) ?></title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@5.4.4/dist/photoswipe.css">
+    <link rel="stylesheet" href="assets/photoswipe/photoswipe.css">
     <style>
       body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #172033; }
       main { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem; }
@@ -125,12 +125,15 @@ function imageUrl(string $path, ImageVariant $variant, string $version): string
             <?php endforeach; ?>
           </div>
           <script type="module">
-            import PhotoSwipeLightbox from 'https://cdn.jsdelivr.net/npm/photoswipe@5.4.4/dist/photoswipe-lightbox.esm.js';
+            // Das "./" ist Pflicht: Ohne hält der Browser "assets/…" für einen
+            // Paketnamen und lädt gar nichts. Aufgelöst wird gegen diese Seite.
+            import PhotoSwipeLightbox from './assets/photoswipe/photoswipe-lightbox.esm.min.js';
 
             const lightbox = new PhotoSwipeLightbox({
               gallery: '#photo-gallery',
               children: 'a',
-              pswpModule: () => import('https://cdn.jsdelivr.net/npm/photoswipe@5.4.4/dist/photoswipe.esm.js')
+              // Der Kern kommt erst beim ersten Öffnen eines Bildes.
+              pswpModule: () => import('./assets/photoswipe/photoswipe.esm.min.js')
             });
 
             lightbox.init();

@@ -10,6 +10,7 @@ config.php          die einzige Datei, die man anpasst
 bilder-demo/        Originalbilder, nach Jahr und Album sortiert
 var/cache/images/   erzeugte Varianten (thumbnail/ und large/), jederzeit löschbar
 public/             die beiden Einstiegspunkte fürs Web
+public/assets/      PhotoSwipe für die Lightbox, mitgeliefert statt vom CDN
 bin/                Wartungsbefehle: Varianten erzeugen, Cache aufräumen
 src/                Anwendungscode
 ```
@@ -63,10 +64,13 @@ Invalidierung durch Benennung ersetzt.
 Zwei Konsequenzen, die man kennen muss:
 
 - Weil eine URL mit `v` genau eine Fassung bezeichnet, darf sie ein Jahr lang
-  gecacht werden (`immutable`). Ohne `v` — etwa bei einem direkten Link — kann
-  sich der Inhalt unter derselben URL ändern; dann wird nur 5 Minuten gecacht
-  und danach per ETag revalidiert. Die Ordnerseite selbst ist `no-cache`, denn
-  nur wenn sie frisch ist, erfährt der Browser von einem neuen Fingerabdruck.
+  gecacht werden (`immutable`) — allerdings nur im Browser (`private`). Ein
+  Proxy oder CDN dazwischen kennt `isAuthorized` nicht und würde ein
+  geschütztes Bild an jeden ausliefern. Ohne `v` — etwa bei einem direkten
+  Link — kann sich der Inhalt unter derselben URL ändern; dann wird nur
+  5 Minuten gecacht und danach per ETag revalidiert. Die Ordnerseite selbst ist
+  `no-cache`, denn nur wenn sie frisch ist, erfährt der Browser von einem neuen
+  Fingerabdruck.
 - Beim Schreiben einer neuen Fassung entfernt der Generator die Varianten der
   vorherigen Fassung desselben Bildes. Ein ausgetauschtes Bild hinterlässt
   dadurch keinen Müll. Für gelöschte Bilder und Ordner gibt es
@@ -234,6 +238,22 @@ Hinweis ins Fehlerprotokoll.
 Geprüft gegen PHP 8.5 (Docker-Image und Testlauf, siehe unten) – die Version,
 die auch im netcup-Webhosting als Standard auswählbar ist. Läuft die Galerie
 sauber im Docker-Container, läuft sie damit auch dort.
+
+## Lightbox
+
+Die Lightbox ist [PhotoSwipe](https://photoswipe.com) 5.4.4 (MIT-Lizenz). Die
+Dateien liegen in `public/assets/photoswipe/` und werden mit ausgeliefert. Es
+geht also keine Anfrage an einen fremden Server, und die Galerie hängt nicht
+davon ab, ob ein CDN erreichbar ist.
+
+Die Dateien stammen unverändert aus `dist/` des npm-Pakets: `photoswipe.css`,
+`photoswipe-lightbox.esm.min.js` und `photoswipe.esm.min.js`, dazu `LICENSE`.
+Für ein Update dieselben Dateien aus der neuen Version ersetzen und die
+Versionsnummer hier nachtragen.
+
+`public/index.php` lädt sie über relative Pfade. Das passt, solange die Seite
+direkt aus `public/` ausgeliefert wird. Wird sie anderswo eingebunden, müssen
+die Pfade dorthin zeigen, wo `assets/` dann erreichbar ist.
 
 ## Lokaler Start mit Docker
 
