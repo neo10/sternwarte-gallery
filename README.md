@@ -10,7 +10,7 @@ config.php          die einzige Datei, die man anpasst
 bilder-demo/        Originalbilder, nach Jahr und Album sortiert
 var/cache/images/   erzeugte Varianten (thumbnail/ und large/), jederzeit löschbar
 public/             die beiden Einstiegspunkte fürs Web
-public/assets/      PhotoSwipe für die Lightbox, mitgeliefert statt vom CDN
+public/assets/      Stylesheet der Galerie (gallery.css) und PhotoSwipe für die Lightbox
 bin/                Wartungsbefehle: Varianten erzeugen, Cache aufräumen
 src/                Anwendungscode
 ```
@@ -24,6 +24,7 @@ Wichtige Klassen:
 | `GalleryRepository`       | Schnittstelle, gegen die das Frontend programmiert            |
 | `GalleryPathResolver`     | einzige Stelle, die über die Sicherheit von Pfaden entscheidet |
 | `GalleryDirectoryBrowser` | liest Ordner und Bilder eines Verzeichnisses                  |
+| `GalleryView`             | erzeugt das HTML: Galerie-Inhalt und eigenständiges Seitengerüst |
 | `ImageFile`               | Format, Abmessungen, EXIF-Ausrichtung, Laden einer Bilddatei  |
 | `ImageVariant`            | die Bildgrößen samt Breite, Qualität und Skalierung           |
 | `ImageVariantStore`       | weiß, wo eine Variante im Cache liegt (Pfad mit Fingerabdruck) |
@@ -177,6 +178,7 @@ return new GalleryConfig(
     baseDir: __DIR__ . '/bilder-demo',
     cacheDir: __DIR__ . '/var/cache/images',
     isAuthorized: static function (): bool { ... },
+    // layout: static function (string $title, string $content): void { ... },
 );
 ```
 
@@ -186,6 +188,7 @@ return new GalleryConfig(
 | `baseDir`      | Ordner mit den Originalbildern; wird nur gelesen                  |
 | `cacheDir`     | Ordner für die erzeugten Varianten; darf jederzeit gelöscht werden |
 | `isAuthorized` | Zugriffsprüfung, siehe unten                                      |
+| `layout`       | optional: Seitengerüst einer Website, die die Galerie einbettet; siehe unten |
 
 `baseDir` und `cacheDir` lesen standardmäßig `GALLERY_BASE_DIR` und
 `GALLERY_CACHE_DIR` aus der Umgebung — praktisch fürs Deployment, kann man in
@@ -229,6 +232,84 @@ Zwei Dinge, die man dabei wissen muss:
 entsteht dadurch nie aus Versehen, sondern nur, wenn jemand ausdrücklich `true`
 hinschreibt.
 
+## Einbetten in eine bestehende Website
+
+Ohne weitere Einstellung ist die Galerie eine eigenständige Seite. Soll sie
+stattdessen zwischen Kopf und Fuß einer bestehenden Website erscheinen, bekommt
+`config.php` ein `layout`:
+
+```php
+layout: static function (string $title, string $content): void {
+    require_once '/pfad/zur/website/kopf-und-fuss.php';
+    seitenkopf($title);
+    echo $content;
+    seitenfuss();
+},
+```
+
+- `$title` ist der Seitentitel als **Klartext**, etwa „Mondfinsternis –
+  Sternwarte-Galerie“. Die Website muss ihn selbst escapen, bevor er ins HTML
+  kommt.
+- `$content` ist fertiges HTML und wird unverändert ausgegeben. Er ist in sich
+  geschlossen: zwei `<link rel="stylesheet">`, der Container
+  `<div class="sternwarte-gallery">` und das Lightbox-Skript. Ein eigenes
+  `<html>`, `<head>` oder `<body>` enthält er nicht. Stylesheets im `<body>`
+  erlaubt die HTML-Spezifikation ausdrücklich.
+
+`src/`, `public/` und `bin/` bleiben dabei unverändert. Angepasst wird wie
+immer nur `config.php`.
+
+### CSS: was die Galerie festlegt und was sie erbt
+
+`public/assets/gallery.css` wirkt nur innerhalb von `.sternwarte-gallery`. Kein
+Selektor greift nach außen, Kopf und Fuß der Website bleiben unberührt. Ein
+Test prüft das für jeden Selektor.
+
+- **Die Galerie legt fest:** die Ordnerliste (ohne Aufzählungszeichen, mit
+  Trennlinien), das Raster (Spalten, Abstände), die Thumbnails (145 px hoch,
+  beschnitten, abgerundet) und die Bildunterschriften (einzeilig, mit …
+  gekürzt).
+- **Von der Website erbt sie:** Schriftart, Schriftgröße, Text- und Linkfarbe
+  sowie die Gestaltung der Überschriften. Dadurch sieht sie eingebaut aus.
+
+Was das Raster braucht, setzt `gallery.css` ausdrücklich, auch wo es dem
+Browser-Standard entspricht. Eine Website-Regel wie `img { height: 30px }` oder
+`ul { list-style: disc }` verbiegt die Galerie deshalb nicht. Die Selektoren
+sind dafür eine Klasse spezifischer als nötig
+(`.sternwarte-gallery .image-grid img`) und kommen ohne `!important` aus.
+Gegen Website-Regeln mit noch höherer Spezifität, etwa über eine ID
+(`#inhalt img`), hilft das nicht. Solche Regeln muss die Website selbst
+eingrenzen.
+
+Das Seitengerüst der eigenständigen Galerie (Seitenränder, Schrift, Farben,
+zentrierte Spalte) steht allein in `GalleryView::renderPage()` und fällt beim
+Einbetten weg.
+
+Die Lightbox hängt PhotoSwipe ans Ende von `<body>`, also außerhalb des
+Containers. Ihr Stylesheet ist ebenso gekapselt: Alle Selektoren beginnen mit
+`.pswp`.
+
+### Was man dabei wissen muss
+
+- **`assets/` muss per Web erreichbar sein, relativ zur Seite.** Die Galerie
+  verlinkt relativ: `index.php?folder=…`, `image.php?…`, `assets/…`. Ausgeliefert
+  wird auch die eingebettete Seite über `public/index.php`; liegt `public/` im
+  Webroot, stimmt also alles. Liegt `public/` nicht im Webroot und die Website
+  bindet `index.php` und `image.php` über eigene Dateien ein, muss sie
+  `public/assets/` daneben kopieren — und nach jedem Update der Galerie erneut.
+- **403 und 404 laufen ohne Layout**, als kurzer Klartext. Die Funktion wird nur
+  für eine fertige Ordnerseite aufgerufen. Bis dahin ist nichts ausgegeben; sie
+  kann also noch Header senden oder eine Session starten. Eine Ausnahme darin
+  wird nicht abgefangen und landet wie jeder Fehler im Protokoll.
+- **`config.php` steht unter `declare(strict_types=1)`**, und das gilt auch für
+  die Funktion darin: Aufrufe von Funktionen der Website mit Skalar-Typen werden
+  strikt geprüft. Eine Seiten-ID als String an einen `int`-Parameter ergibt dann
+  einen `TypeError` statt einer stillen Umwandlung.
+- **Die Ordnerseite darf nicht lange gecacht werden.** `index.php` sendet vor
+  dem Layout `Cache-Control: no-cache`, denn nur eine frische Seite trägt die
+  aktuellen Fingerabdrücke. Ersetzt das Layout den Header durch einen langen
+  Cache, erfährt der Browser erst verspätet von ausgetauschten Bildern.
+
 ## Voraussetzungen
 
 PHP 8.1 oder neuer mit den Erweiterungen `gd` (mit WebP-Unterstützung) und
@@ -251,9 +332,9 @@ Die Dateien stammen unverändert aus `dist/` des npm-Pakets: `photoswipe.css`,
 Für ein Update dieselben Dateien aus der neuen Version ersetzen und die
 Versionsnummer hier nachtragen.
 
-`public/index.php` lädt sie über relative Pfade. Das passt, solange die Seite
-direkt aus `public/` ausgeliefert wird. Wird sie anderswo eingebunden, müssen
-die Pfade dorthin zeigen, wo `assets/` dann erreichbar ist.
+Die Galerie lädt sie über relative Pfade (`assets/…`). Das passt, solange die
+Seite aus dem Ordner kommt, in dem auch `assets/` liegt — siehe
+„Einbetten in eine bestehende Website“.
 
 ## Lokaler Start mit Docker
 

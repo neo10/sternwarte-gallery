@@ -77,4 +77,44 @@ return new GalleryConfig(
     isAuthorized: static function (): bool {
         return true;
     },
+
+    /*
+     * ------------------------------------------------------------------------
+     *  EINBETTEN IN EINE BESTEHENDE WEBSITE (optional)
+     * ------------------------------------------------------------------------
+     *
+     * Ohne diese Einstellung ist die Galerie eine eigenständige Seite mit
+     * eigenem Seitenkopf. Mit ihr erscheint sie im Seitengerüst der Website:
+     * Die Funktion bekommt den fertigen Galerie-Inhalt und gibt ihn zwischen
+     * Kopf und Fuß der Website aus.
+     *
+     *     $title    Seitentitel, z. B. "Mondfinsternis – Sternwarte-Galerie".
+     *               KLARTEXT – vor der Ausgabe in HTML selbst escapen.
+     *     $content  fertiges HTML, unverändert ausgeben. Bringt seine
+     *               Stylesheets und das Lightbox-Skript selbst mit.
+     *
+     * Zum Einschalten das Beispiel unter diesem Kommentar einkommentieren und
+     * an die Website anpassen.
+     *
+     * Was man dabei wissen muss:
+     *
+     * 1. Aufgerufen wird die Funktion nur für eine fertige Ordnerseite. 403 und
+     *    404 gehen ohne Layout als Klartext hinaus. Bis zum Aufruf ist nichts
+     *    ausgegeben; Header und session_start() sind hier also noch möglich.
+     *
+     * 2. Diese Datei steht unter declare(strict_types=1), und das gilt auch für
+     *    die Funktion: Ruft sie Funktionen der Website mit Skalar-Typen auf
+     *    (int, string, …), wird strikt geprüft. Eine Zahl als String an einen
+     *    int-Parameter ergibt dann einen TypeError statt einer Umwandlung.
+     *
+     * 3. Die Galerie verlinkt relativ (index.php, image.php, assets/). Die
+     *    Seite muss deshalb aus dem Ordner kommen, in dem auch image.php und
+     *    assets/ per Web erreichbar sind.
+     */
+    // layout: static function (string $title, string $content): void {
+    //     require_once '/pfad/zur/website/kopf-und-fuss.php';
+    //     seitenkopf($title);
+    //     echo $content;
+    //     seitenfuss();
+    // },
 );

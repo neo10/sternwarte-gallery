@@ -1,0 +1,79 @@
+/*
+ * Stylesheet der Galerie. Jede Regel gilt nur innerhalb von .sternwarte-gallery:
+ * In eine fremde Website eingebettet, darf hier nichts nach außen wirken.
+ * tests/GalleryTest.php prüft das für jeden Selektor.
+ *
+ * Festgelegt wird nur, was das Layout braucht: Ordnerliste, Raster, Bildgrößen,
+ * Abstände, Bildunterschriften. Diese Eigenschaften stehen ausdrücklich da, auch
+ * wo sie dem Browser-Standard entsprechen, damit Regeln der Website wie
+ * "img { … }" oder "ul { … }" sie nicht verbiegen. Dafür tragen die Selektoren
+ * eine Klasse mehr als nötig: ".sternwarte-gallery .image-grid img" setzt sich
+ * auch gegen ".inhalt img" durch, ganz ohne !important.
+ *
+ * Schriftart, Grundgröße und Farben fehlen mit Absicht. Eingebettet erbt die
+ * Galerie sie von der Website und sieht dadurch eingebaut aus; eigenständig
+ * setzt sie das Seitengerüst in GalleryView::renderPage().
+ */
+
+/* Ordnerliste */
+
+.sternwarte-gallery .folder-list {
+  margin: 1em 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sternwarte-gallery .folder-list li {
+  margin: 0;
+  padding: .4rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* Bilderraster */
+
+.sternwarte-gallery .images {
+  margin-top: 3rem;
+}
+
+.sternwarte-gallery .image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+}
+
+.sternwarte-gallery .image-grid figure {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sternwarte-gallery .image-grid a {
+  display: block;
+  padding: 0;
+  border: 0;
+}
+
+.sternwarte-gallery .image-grid img {
+  display: block;
+  float: none;
+  width: 100%;
+  max-width: none;
+  height: 145px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: .4rem;
+  object-fit: cover;
+  background: #e2e8f0;
+}
+
+.sternwarte-gallery .image-grid figcaption {
+  overflow: hidden;
+  margin: .35rem 0 0;
+  padding: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .9rem;
+}

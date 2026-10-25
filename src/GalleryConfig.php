@@ -18,12 +18,15 @@ namespace SternwarteGallery;
 final class GalleryConfig
 {
     /**
-     * @param string   $title        Überschrift und Browser-Titel der Galerie
-     * @param string   $baseDir      Ordner mit den Originalbildern; wird nur gelesen
-     * @param string   $cacheDir     Ordner für die erzeugten Varianten; wird beschrieben
-     *                               und darf jederzeit gelöscht werden
-     * @param \Closure $isAuthorized Zugriffsprüfung für jede Web-Anfrage,
-     *                               ausführlich beschrieben in config.php
+     * @param string    $title        Überschrift und Browser-Titel der Galerie
+     * @param string    $baseDir      Ordner mit den Originalbildern; wird nur gelesen
+     * @param string    $cacheDir     Ordner für die erzeugten Varianten; wird beschrieben
+     *                                und darf jederzeit gelöscht werden
+     * @param \Closure  $isAuthorized Zugriffsprüfung für jede Web-Anfrage,
+     *                                ausführlich beschrieben in config.php
+     * @param ?\Closure $layout       Seitengerüst einer einbettenden Website,
+     *                                function (string $title, string $content): void;
+     *                                null = eigenständige Seite. Siehe config.php
      *
      * @throws \InvalidArgumentException bei einer unbrauchbaren Einstellung
      */
@@ -32,6 +35,7 @@ final class GalleryConfig
         public readonly string $baseDir,
         public readonly string $cacheDir,
         public readonly \Closure $isAuthorized,
+        public readonly ?\Closure $layout = null,
     ) {
         if (trim($title) === '') {
             throw new \InvalidArgumentException('config.php: "title" darf nicht leer sein.');

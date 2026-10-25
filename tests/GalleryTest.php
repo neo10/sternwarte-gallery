@@ -5,6 +5,7 @@ declare(strict_types=1);
 use SternwarteGallery\Gallery;
 use SternwarteGallery\GalleryConfig;
 use SternwarteGallery\GalleryPathResolver;
+use SternwarteGallery\GalleryView;
 use SternwarteGallery\ImageFile;
 use SternwarteGallery\ImageVariant;
 use SternwarteGallery\ImageVariantGenerator;
@@ -143,6 +144,60 @@ function removeTree(string $path): void
     }
 
     rmdir($path);
+}
+
+/** CSS ohne Kommentare – in einem Kommentar darf durchaus "img {" stehen. */
+function withoutCssComments(string $css): string
+{
+    return (string) preg_replace('~/\*.*?\*/~s', '', $css);
+}
+
+/**
+ * Alle Selektoren eines Stylesheets, auch die in @media, @supports, @container
+ * und @layer. Andere @-Regeln (@font-face, @keyframes …) enthalten keine
+ * Selektoren und werden übersprungen.
+ *
+ * Bewusst einfach gehalten: Geschweifte Klammern in Zeichenketten
+ * (content: "{") kennt der Parser nicht.
+ *
+ * @return list<string>
+ */
+function cssSelectors(string $css): array
+{
+    $css = withoutCssComments($css);
+    $selectors = [];
+    $position = 0;
+
+    while (($open = strpos($css, '{', $position)) !== false) {
+        // Anweisungen ohne Block (@import …;) gehören nicht zum Selektor.
+        $prelude = substr($css, $position, $open - $position);
+        $statementEnd = strrpos($prelude, ';');
+        $prelude = trim($statementEnd === false ? $prelude : substr($prelude, $statementEnd + 1));
+
+        $depth = 1;
+        $close = $open;
+        while ($depth > 0) {
+            $close += 1 + strcspn($css, '{}', $close + 1);
+            if ($close >= strlen($css)) {
+                throw new RuntimeException('Unvollständiges CSS: Eine Klammer wird nicht geschlossen.');
+            }
+            $depth += $css[$close] === '{' ? 1 : -1;
+        }
+        $block = substr($css, $open + 1, $close - $open - 1);
+
+        if (preg_match('~^@(media|supports|container|layer)\b~i', $prelude) === 1) {
+            array_push($selectors, ...cssSelectors($block));
+        } elseif (!str_starts_with($prelude, '@')) {
+            // Kommas in Klammern wie bei :is(a, b) trennen keine Selektoren.
+            foreach (preg_split('~,(?![^(]*\))~', $prelude) ?: [] as $selector) {
+                $selectors[] = trim($selector);
+            }
+        }
+
+        $position = $close + 1;
+    }
+
+    return $selectors;
 }
 
 $test = new TestRunner();
@@ -427,6 +482,107 @@ try {
         static fn () => new GalleryConfig(title: 'X', baseDir: $root . DIRECTORY_SEPARATOR . 'gibtsnicht', cacheDir: $cache, isAuthorized: $allowEverything),
         'Ein nicht vorhandener Bilderordner wird abgewiesen.',
     );
+
+    $test->same(null, $config->layout, 'Ohne "layout" bleibt die Galerie eine eigenständige Seite.');
+    $layout = static function (string $title, string $content): void {
+    };
+    $test->same(
+        $layout,
+        (new GalleryConfig(title: 'X', baseDir: $root, cacheDir: $cache, isAuthorized: $allowEverything, layout: $layout))->layout,
+        'Ein gesetztes "layout" wird übernommen.',
+    );
+
+    echo "Galerie-Inhalt\n";
+    $view = new GalleryView('Testgalerie');
+    $rootFolder = $gallery->browse();
+    $content = $view->renderFolder($rootFolder);
+
+    // Der Inhalt landet eingebettet mitten in einer fremden Seite. Ein
+    // Seitengerüst darin ergäbe dort ein zweites <head> oder <body>.
+    $test->same(0, preg_match('~<(!doctype|html|head|body)\b~i', $content), 'Der Inhalt enthält kein Seitengerüst.');
+    $test->true(!str_contains($content, 'name="viewport"'), 'Der Inhalt setzt keinen Viewport – das ist Sache der Seite.');
+
+    $photoSwipeCss = strpos($content, '<link rel="stylesheet" href="assets/photoswipe/photoswipe.css">');
+    $galleryCss = strpos($content, '<link rel="stylesheet" href="assets/gallery.css">');
+    $container = strpos($content, '<div class="sternwarte-gallery">');
+    $module = strpos($content, '<script type="module">');
+    $test->true($photoSwipeCss !== false && $galleryCss !== false, 'Der Inhalt bringt beide Stylesheets selbst mit.');
+    $test->true($container !== false, 'Der Inhalt steckt im Wurzel-Container .sternwarte-gallery.');
+    $test->true($module !== false && str_contains($content, "'./assets/photoswipe/photoswipe-lightbox.esm.min.js'"), 'Der Inhalt bringt das PhotoSwipe-Modul mit.');
+    $test->true(
+        $galleryCss < $container && $container < $module && strrpos($content, '</div>') < $module,
+        'Reihenfolge: Stylesheets, dann der Container, dann das Skript.',
+    );
+    $test->true(
+        str_contains($content, 'src="image.php?file=bild.png&amp;variant=thumbnail&amp;v=' . $sampleVersion . '"'),
+        'Das Raster zeigt das Thumbnail mit Fingerabdruck in der URL.',
+    );
+    $test->true(
+        str_contains($content, 'href="image.php?file=bild.png&amp;variant=large&amp;v=' . $sampleVersion . '"'),
+        'Die Lightbox bekommt die große Fassung mit Fingerabdruck in der URL.',
+    );
+    $test->true(!str_contains($view->renderFolder($gallery->browse('2024')), '<script'), 'Ein Ordner ohne Bilder lädt kein Lightbox-Skript.');
+
+    echo "Eigenständige Seite\n";
+    $test->same('Album – Testgalerie', $view->pageTitle(['name' => 'Album']), 'Der Seitentitel lautet "Ordner – Galerie".');
+    $page = $view->renderPage($view->pageTitle($rootFolder), $content);
+    $test->true(str_starts_with($page, '<!doctype html>'), 'Die eigenständige Seite beginnt mit <!doctype html>, ohne Leerraum davor.');
+    $test->true(str_contains($page, '<title>' . $rootFolder['name'] . ' – Testgalerie</title>'), 'Die eigenständige Seite trägt den Seitentitel.');
+    $test->true(str_contains($page, '<meta name="viewport" content="width=device-width, initial-scale=1">'), 'Die eigenständige Seite setzt den Viewport.');
+    $contentAt = strpos($page, $content);
+    $test->true(
+        $contentAt !== false && strpos($page, '<main>') < $contentAt && $contentAt + strlen($content) < strpos($page, '</main>'),
+        'Der Inhalt steht unverändert in <main>, wie bisher.',
+    );
+
+    echo "Escaping\n";
+    $hostile = '<script>alert("x")</script> & \'Co\'';
+    $hostileEscaped = '&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &#039;Co&#039;';
+    $hostileView = new GalleryView('Galerie <b>&</b>');
+    $hostileFolder = [
+        'path' => '2024/a&b',
+        'name' => $hostile,
+        'parentPath' => '2024/"oben"',
+        'folders' => [['name' => $hostile, 'path' => '2024/a&b/<unten>']],
+        'images' => [['name' => $hostile . '.jpg', 'path' => '2024/a&b/"bild".jpg', 'width' => 100, 'height' => 50, 'version' => 'abc"def']],
+    ];
+    $hostileContent = $hostileView->renderFolder($hostileFolder);
+    $test->true(!str_contains($hostileContent, '<script>alert'), 'Namen können kein Markup einschleusen.');
+    $test->true(str_contains($hostileContent, '<h1>' . $hostileEscaped . '</h1>'), 'Der Ordnername erscheint mit Entitäten.');
+    $test->true(str_contains($hostileContent, '<figcaption>' . $hostileEscaped . '.jpg</figcaption>'), 'Der Bildname erscheint mit Entitäten.');
+    $test->true(str_contains($hostileContent, '>Galerie &lt;b&gt;&amp;&lt;/b&gt;</a>'), 'Der Galerietitel wird escaped.');
+    $test->true(str_contains($hostileContent, 'href="index.php?folder=2024%2F%22oben%22"'), 'Ordner-URLs werden kodiert.');
+    $test->true(
+        str_contains($hostileContent, 'href="image.php?file=2024%2Fa%26b%2F%22bild%22.jpg&amp;variant=large&amp;v=abc%22def"'),
+        'Bild-URLs werden kodiert und für das Attribut escaped.',
+    );
+
+    // Die Schnittstelle zum Layout: Der Titel geht als Klartext hinaus, escaped
+    // wird erst bei der Ausgabe – sonst stünde dort doppelt escapter Text.
+    $hostileTitle = $hostileView->pageTitle($hostileFolder);
+    $test->same($hostile . ' – Galerie <b>&</b>', $hostileTitle, 'pageTitle() liefert Klartext, nicht vorab escaped.');
+    $test->true(
+        str_contains($hostileView->renderPage($hostileTitle, ''), '<title>' . $hostileEscaped . ' – Galerie &lt;b&gt;&amp;&lt;/b&gt;</title>'),
+        'Die eigenständige Seite escaped den Titel.',
+    );
+
+    echo "CSS-Kapselung\n";
+    $test->same(
+        ['.sternwarte-gallery a', 'img', 'ul', '.sternwarte-gallery :is(h1, h2)'],
+        cssSelectors('/* p { } */ .sternwarte-gallery a, img { color: red } @media (min-width: 1px) { ul { margin: 0 } } @keyframes k { from { opacity: 0 } } .sternwarte-gallery :is(h1, h2) { margin: 0 }'),
+        'Die Selektorsuche findet auch Regeln in @media und überspringt Kommentare und @keyframes.',
+    );
+
+    // Eingebettet darf keine Regel der Galerie die Website treffen.
+    $galleryStylesheet = (string) file_get_contents(__DIR__ . '/../public/assets/gallery.css');
+    $gallerySelectors = cssSelectors($galleryStylesheet);
+    $test->true(count($gallerySelectors) > 0, 'gallery.css enthält Regeln – sonst wäre die nächste Prüfung wertlos.');
+    $test->same(
+        [],
+        array_values(array_filter($gallerySelectors, static fn (string $selector): bool => preg_match('~^\.sternwarte-gallery(?![\w-])~', $selector) !== 1)),
+        'Jeder Selektor in gallery.css beginnt mit .sternwarte-gallery.',
+    );
+    $test->same(0, preg_match('~!\s*important~i', withoutCssComments($galleryStylesheet)), 'gallery.css kommt ohne !important aus.');
 } finally {
     removeTree($root);
     removeTree($cache);
